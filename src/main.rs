@@ -31,5 +31,6 @@ fn main() {
     s1.set(2);
     s1.set(3);
     s1.set(4);
+    s1.set(5);
     s2.set("signal 2@2");
 }
