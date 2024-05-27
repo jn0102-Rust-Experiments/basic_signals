@@ -4,13 +4,14 @@ pub type SignalObserver<'c> = Rc<dyn Fn() + 'c>;
 
 #[derive(Clone)]
 pub struct SignalContext<'c> {
-    current_observer: Rc<RefCell<Option<SignalObserver<'c>>>>,
+    observers: Rc<RefCell<Vec<SignalObserver<'c>>>>,
+    current_observer: Rc<RefCell<Option<usize>>>,
 }
 
 #[derive(Clone)]
 pub struct Signal<'c, T: Clone> {
     value: Rc<RefCell<T>>,
-    observers: Rc<RefCell<Vec<SignalObserver<'c>>>>,
+    observers: Rc<RefCell<Vec<usize>>>,
     context: SignalContext<'c>,
 }
 
@@ -19,8 +20,8 @@ impl<'c, T: Clone> Signal<'c, T> {
         self.value.replace(value);
         let observers = self.observers.borrow().clone();
 
-        for observer in observers {
-            observer();
+        for observer_idx in observers {
+            self.context.observers.borrow()[observer_idx]();
         }
     }
 
@@ -36,7 +37,7 @@ impl<'c, T: Clone> Signal<'c, T> {
 }
 
 impl<'c> SignalContext<'c> {
-    fn set_current_observer(&self, observer: SignalObserver<'c>) {
+    fn set_current_observer(&self, observer: usize) {
         self.current_observer.borrow_mut().replace(observer);
     }
 
@@ -46,6 +47,7 @@ impl<'c> SignalContext<'c> {
 
     pub fn new() -> Self {
         SignalContext {
+            observers: Rc::new(RefCell::new(Vec::new())),
             current_observer: Rc::new(RefCell::new(None)),
         }
     }
@@ -60,8 +62,9 @@ impl<'c> SignalContext<'c> {
 
     pub fn create_effect(&self, effect: impl Fn() + 'c) {
         let effect_rc = Rc::new(effect);
-        
-        self.set_current_observer(effect_rc.clone());
+
+        self.set_current_observer(self.observers.borrow().len());
+        self.observers.borrow_mut().push(effect_rc.clone());
         effect_rc();
         self.remove_current_observer();
     }
